@@ -1,19 +1,14 @@
 PYTHON = python2.7
-PYTHON_TARGETS = bin/python lib/python* include/python*
-
-VIRTUALENV_URL = https://pypi.python.org/packages/py2.py3/v/virtualenv/virtualenv-1.11.2-py2.py3-none-any.whl
-VIRTUALENV_MD5 = a18326dc067b528cfd2b3fce495d540d
-VIRTUALENV_FILENAME = $(lastword $(subst /, ,$(VIRTUALENV_URL)))
-VIRTUALENV_PATH = downloads/$(VIRTUALENV_FILENAME)
-VIRTUALENV = $(PYTHON) virtualenv/virtualenv.py
+PYTHON_TARGETS = bin/python lib/python* include/python* src/*/setup.py
+VIRTUALENV = virtualenv
 
 MFSBSD_URL = http://mfsbsd.vx.sk/files/iso/9/amd64/mfsbsd-se-9.2-RELEASE-amd64.iso
 MFSBSD_FILENAME = $(lastword $(subst /, ,$(MFSBSD_URL)))
 MFSBSD_PATH = downloads/$(MFSBSD_FILENAME)
-MFSBSD_MD5 = 660d2b65e55a982c071891b7996fe684
+MFSBSD_SHA = 4ef70dfd7b5255e36f2f7e1a5292c7a05019c8ce
 
 VM_BASEFOLDER = $(abspath vm)
-VM_NAME = freebsd-test-dummy
+VM_NAME = ezjail-test-vm
 VM_PATH = $(VM_BASEFOLDER)/$(VM_NAME)
 VM_VBOX = $(VM_PATH)/$(VM_NAME).vbox
 VM_BOOT_DISK = $(VM_PATH)/boot.vdi
@@ -22,37 +17,21 @@ all: .installed.cfg
 
 .SUFFIXES:
 
-.SECONDARY: virtualenv/virtualenv.py
-
-.INTERMEDIATE: check_virtualenv_download \
-	python
+.INTERMEDIATE: python \
 	check_mfsbsd_download mfsbsd_download
 
 .PHONY: all \
 	vm startvm stopvm bootstrapvm destroyvm \
 	clean dist-clean
 
-
 downloads:
 	mkdir -p downloads
 
 
-check_virtualenv_download:
-	@test "`md5 -q $(VIRTUALENV_PATH)`" = "$(VIRTUALENV_MD5)" || rm -f $(VIRTUALENV_PATH)
-
-$(VIRTUALENV_PATH): downloads
-	wget -c "$(VIRTUALENV_URL)" -O $(VIRTUALENV_PATH)
-
-virtualenv/virtualenv.py: check_virtualenv_download $(VIRTUALENV_PATH)
-	$(PYTHON) -m zipfile -e $(VIRTUALENV_PATH) virtualenv
-
-
 $(PYTHON_TARGETS): python
 
-python: virtualenv/virtualenv.py
+python:
 	$(VIRTUALENV) --clear .
-	-./clear-setuptools-dependency-links
-	touch $(PYTHON_TARGETS)
 
 
 bin/ansible: $(PYTHON_TARGETS)
@@ -63,15 +42,13 @@ bin/ansible: $(PYTHON_TARGETS)
 bin/buildout: $(PYTHON_TARGETS) bin/ansible
 	bin/pip install --upgrade --force-reinstall zc.buildout
 	touch bin/buildout
-	-./clear-setuptools-dependency-links
 
 
 .installed.cfg: bin/buildout buildout.cfg src/*/setup.py
 	bin/buildout -v
 
-
 check_mfsbsd_download:
-	@test "`md5 -q $(MFSBSD_PATH)`" = "$(MFSBSD_MD5)" || rm -f $(MFSBSD_PATH)
+	echo "$(MFSBSD_SHA)  $(MFSBSD_PATH)" | shasum -c || rm -f $(MFSBSD_PATH)
 
 $(MFSBSD_PATH): downloads
 	wget -c "$(MFSBSD_URL)" -O $(MFSBSD_PATH)
@@ -94,7 +71,7 @@ $(VM_VBOX): $(VM_BOOT_DISK)
 	VBoxManage storagectl $(VM_NAME) --name "SATA" --add sata
 	VBoxManage storageattach $(VM_NAME) --storagectl "SATA" --type dvddrive --port 0 --medium $(MFSBSD_PATH)
 	VBoxManage storageattach $(VM_NAME) --storagectl "SATA" --type hdd --port 1 --medium $(VM_BOOT_DISK)
-	VBoxManage modifyvm $(VM_NAME) --natpf1 "ssh,tcp,,47022,,22"
+	VBoxManage modifyvm $(VM_NAME) --natpf1 "ssh,tcp,,47022,,22" --natpf1 "http,tcp,,47023,,80"
 
 
 vm: mfsbsd_download $(VM_VBOX)
@@ -106,10 +83,6 @@ startvm: vm
 
 stopvm:
 	VBoxManage controlvm $(VM_NAME) acpipowerbutton
-
-
-bootstrapvm: .installed.cfg
-	./bin/aws do vm-master bootstrap
 
 
 destroyvm:
