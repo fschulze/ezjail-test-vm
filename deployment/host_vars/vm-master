@@ -10,4 +10,3 @@ ipnat_rules:
     - "# forwards for btsync:"
     - "rdr {{ ipnat_rules_interface }} {{ ipnat_rules_address }}/32 port 6667 -> {{ hostvars['btsync']['awsome_ip'] }} port 6667"
     - "rdr {{ ipnat_rules_interface }} {{ ipnat_rules_address }}/32 port 6668 -> {{ hostvars['btsync']['awsome_ip'] }} port 6668"
-dhcp_host_sshd_interface: "em0"
