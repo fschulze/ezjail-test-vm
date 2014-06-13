@@ -1,0 +1,16 @@
+---
+- name: install virtualbox-ose-additions
+  pkgng: name=virtualbox-ose-additions state=present
+  tags: virtualbox_guest_additions
+- name: Enable vboxguest in rc.conf
+  lineinfile: dest=/etc/rc.conf regexp=^vboxguest_enable= line=vboxguest_enable=\"YES\"
+  notify: restart vboxguest
+  tags: virtualbox_guest_additions
+- name: Enable vboxservice in rc.conf
+  lineinfile: dest=/etc/rc.conf regexp=^vboxservice_enable= line=vboxservice_enable=\"YES\"
+  notify: restart vboxservice
+  tags: virtualbox_guest_additions
+- name: Disable vboxservice host time sync in rc.conf (we use ntpd)
+  lineinfile: dest=/etc/rc.conf regexp=^vboxservice_flags= line=vboxservice_flags="--disable-timesync"
+  notify: restart vboxservice
+  tags: virtualbox_guest_additions

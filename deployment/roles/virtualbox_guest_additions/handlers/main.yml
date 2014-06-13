@@ -1,0 +1,5 @@
+---
+- name: restart vboxguest
+  service: name=vboxguest state=restarted
+- name: restart vboxservice
+  service: name=vboxservice state=restarted
